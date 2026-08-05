@@ -19,6 +19,7 @@ class ConfigTests(unittest.TestCase):
                     {
                         "database": "runtime/catalog.sqlite3",
                         "export": "../exports/pockettube.json",
+                        "subscription_export": "../exports/subscriptions.json",
                     }
                 ),
                 encoding="utf-8",
@@ -33,6 +34,10 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(
                 config_path(config, "export"),
                 (config_file.parent / "../exports/pockettube.json").resolve(),
+            )
+            self.assertEqual(
+                config_path(config, "subscription_export"),
+                (config_file.parent / "../exports/subscriptions.json").resolve(),
             )
 
     def test_missing_configuration_has_actionable_error(self) -> None:

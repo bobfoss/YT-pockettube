@@ -1,0 +1,36 @@
+{
+  "Root": [
+    "UCaaaaaaaaaaaaaaaaaaaaaa",
+    "UCbbbbbbbbbbbbbbbbbbbbbb",
+    "UCbbbbbbbbbbbbbbbbbbbbbb",
+    123,
+    "not a channel"
+  ],
+  "Child": [
+    "UCcccccccccccccccccccccc",
+    "UCaaaaaaaaaaaaaaaaaaaaaa"
+  ],
+  "Other": [
+    "https://www.youtube.com/channel/UCdddddddddddddddddddddd"
+  ],
+  "ysc_collection": {
+    "Root": "Root",
+    "Child": "Child",
+    "Other": "Other"
+  },
+  "ysc_meta": {
+    "Root": {"img": "folder", "position": 0},
+    "Child": {"img": "spark", "position": 1}
+  },
+  "ysc_meta_meta_parts_1": {
+    "Other": {"img": "other", "position": 2}
+  },
+  "ysc_settings": {
+    "sub_groups": {
+      "Root": {
+        "Child": {}
+      },
+      "Other": {}
+    }
+  }
+}

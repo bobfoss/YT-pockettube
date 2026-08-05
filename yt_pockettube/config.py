@@ -11,6 +11,7 @@ DEFAULT_CONFIG_PATH = Path("yt_pockettube.config.json")
 DEFAULT_CONFIG: dict[str, Any] = {
     "database": "yt_pockettube.sqlite3",
     "export": "",
+    "subscription_export": "",
 }
 
 
@@ -32,7 +33,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ConfigError("Configuration must be a JSON object")
     config = {**DEFAULT_CONFIG, **raw, "_config_path": str(config_path)}
-    for key in ("database", "export"):
+    for key in ("database", "export", "subscription_export"):
         if not isinstance(config.get(key), str):
             raise ConfigError(f"Configuration value {key!r} must be a string")
     return config

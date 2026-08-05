@@ -1,4 +1,5 @@
 {
   "database": "yt_pockettube.sqlite3",
-  "export": "exports/youtube_playlist_manager.json"
+  "export": "exports/youtube_playlist_manager.json",
+  "subscription_export": "exports/youtube_subscription_manager.json"
 }

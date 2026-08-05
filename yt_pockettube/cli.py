@@ -11,6 +11,7 @@ from typing import Sequence
 from .config import DEFAULT_CONFIG_PATH, ConfigError, config_path, load_config
 from .database import database_status, initialize_database
 from .importers import PocketTubeFormatError, import_export
+from .subscription_importers import import_subscription_export
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,6 +32,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Override the export path from configuration",
     )
+    subscription_parser = subparsers.add_parser(
+        "import-subscriptions",
+        help="Import the configured PocketTube Subscription Manager export",
+    )
+    subscription_parser.add_argument(
+        "--export",
+        type=Path,
+        help="Override the subscription export path from configuration",
+    )
     subparsers.add_parser("status", help="Show database and latest import status")
     return parser
 
@@ -48,6 +58,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             export = args.export.resolve() if args.export else config_path(config, "export")
             assert export is not None
             payload = import_export(database, export)
+        elif args.command == "import-subscriptions":
+            export = (
+                args.export.resolve()
+                if args.export
+                else config_path(config, "subscription_export")
+            )
+            assert export is not None
+            payload = import_subscription_export(database, export)
         else:
             payload = database_status(database)
         print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
