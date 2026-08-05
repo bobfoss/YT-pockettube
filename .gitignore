@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Private runtime state.
+yt_pockettube.config.json
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+exports/
+backups/

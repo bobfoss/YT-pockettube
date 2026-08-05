@@ -1,0 +1,25 @@
+{
+  "Parent": [
+    "PLalpha0000000001",
+    "https://www.youtube.com/playlist?list=PLbeta00000000002",
+    "PLalpha0000000001",
+    17,
+    "not a playlist"
+  ],
+  "Child": [
+    "OLAK5uy_example000001"
+  ],
+  "Standalone": [],
+  "ysc_meta": {
+    "Parent": {"img": "folder"},
+    "Child": {"img": "spark"},
+    "Standalone": {"img": "box"}
+  },
+  "ysc_settings": {
+    "sub_groups": {
+      "Parent": {
+        "Child": true
+      }
+    }
+  }
+}

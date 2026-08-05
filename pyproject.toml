@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yt-pockettube"
+version = "0.1.0"
+description = "Standalone PocketTube playlist-group catalog for YT Library integration"
+readme = "README.md"
+requires-python = ">=3.12"
+
+[project.scripts]
+yt-pockettube = "yt_pockettube.cli:main"
+
+[tool.setuptools]
+packages = ["yt_pockettube"]
+
+[tool.setuptools.package-data]
+yt_pockettube = ["schema.sql"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E9", "F"]
