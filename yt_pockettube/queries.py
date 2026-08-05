@@ -10,6 +10,7 @@ from .database import connect
 
 MAX_PROJECTED_GROUPS = 10_000
 MAX_PROJECTED_MEMBERSHIPS = 250_000
+UNCATEGORIZED_GROUP_KEY = "__yt_pockettube_derived_uncategorized__"
 
 
 def playlist_group_projection(database_path: Path) -> dict[str, Any]:
@@ -24,7 +25,7 @@ def playlist_group_projection(database_path: Path) -> dict[str, Any]:
         ).fetchone()
         group_count = int(counts["groups"])
         membership_count = int(counts["memberships"])
-        if group_count > MAX_PROJECTED_GROUPS:
+        if group_count + 1 > MAX_PROJECTED_GROUPS:
             raise RuntimeError(
                 f"PocketTube catalog has more than {MAX_PROJECTED_GROUPS} groups"
             )
@@ -55,6 +56,25 @@ def playlist_group_projection(database_path: Path) -> dict[str, Any]:
                 """
             )
         ]
+        if any(group["group_key"] == UNCATEGORIZED_GROUP_KEY for group in groups):
+            raise RuntimeError(
+                "PocketTube catalog uses the reserved Uncategorized group key"
+            )
+        root_positions = [
+            int(group["position"])
+            for group in groups
+            if group["parent_key"] is None
+        ]
+        groups.append(
+            {
+                "group_key": UNCATEGORIZED_GROUP_KEY,
+                "name": "Uncategorized",
+                "parent_key": None,
+                "position": max(root_positions, default=-1) + 1,
+                "icon": "",
+                "include_unmatched": True,
+            }
+        )
         memberships = [
             dict(row)
             for row in conn.execute(

@@ -76,6 +76,14 @@ only against canonical playlists and channels already in its own database.
 References that are not in YT Library remain in this catalog; the plugin does
 not fabricate or import YT Library rows.
 
+The playlist projection also declares a derived `Uncategorized` root. YT
+Library's generic plugin host places canonical playlists there only when no
+explicit PocketTube group contains their IDs. The rule and label are owned by
+this plugin, so the root appears beneath the collapsible `PocketTube` parent and
+disappears entirely when the plugin is disabled. YT PocketTube still receives
+only the canonical ID set supplied through the versioned host contract and
+never opens the YT Library database.
+
 The plugin advertises the generic `playlist_groups` and `channel_groups`
 capabilities. Each catalog remains independently usable when the other has no
 successful import.

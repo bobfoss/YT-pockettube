@@ -8,6 +8,7 @@ from pathlib import Path
 
 from yt_pockettube.importers import PocketTubeFormatError, import_export
 from yt_pockettube.plugin import create_plugin
+from yt_pockettube.queries import UNCATEGORIZED_GROUP_KEY
 from yt_pockettube.subscription_importers import import_subscription_export
 
 
@@ -76,7 +77,7 @@ class PluginTests(unittest.TestCase):
                 status["database"]["subscriptions"]["counts"],
                 {"groups": 3, "memberships": 5, "channels": 4},
             )
-            self.assertEqual(len(projection["groups"]), 3)
+            self.assertEqual(len(projection["groups"]), 4)
             self.assertEqual(len(projection["memberships"]), 3)
             self.assertEqual(len(channel_projection["groups"]), 3)
             self.assertEqual(len(channel_projection["memberships"]), 5)
@@ -89,6 +90,27 @@ class PluginTests(unittest.TestCase):
                     if group["group_key"] == "Child"
                 )["parent_key"],
                 "Parent",
+            )
+            self.assertEqual(
+                next(
+                    group
+                    for group in projection["groups"]
+                    if group["group_key"] == UNCATEGORIZED_GROUP_KEY
+                ),
+                {
+                    "group_key": UNCATEGORIZED_GROUP_KEY,
+                    "name": "Uncategorized",
+                    "parent_key": None,
+                    "position": 2,
+                    "icon": "",
+                    "include_unmatched": True,
+                },
+            )
+            self.assertFalse(
+                any(
+                    membership["group_key"] == UNCATEGORIZED_GROUP_KEY
+                    for membership in projection["memberships"]
+                )
             )
 
             response_status, response = plugin.handle_api("GET", "groups", {})
@@ -117,7 +139,7 @@ class PluginTests(unittest.TestCase):
 
             self.assertEqual(status["state"], "ready")
             self.assertIn("last successful", status["message"])
-            self.assertEqual(len(plugin.project_playlist_groups()["groups"]), 3)
+            self.assertEqual(len(plugin.project_playlist_groups()["groups"]), 4)
 
     def test_plugin_reports_missing_database_without_creating_it(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -154,7 +176,7 @@ class PluginTests(unittest.TestCase):
             plugin.start(FakeContext(root))
 
             self.assertEqual(plugin.status()["state"], "ready")
-            self.assertEqual(len(plugin.project_playlist_groups()["groups"]), 3)
+            self.assertEqual(len(plugin.project_playlist_groups()["groups"]), 4)
             with self.assertRaisesRegex(RuntimeError, "no successful import"):
                 plugin.project_channel_groups()
             response_status, response = plugin.handle_api(
