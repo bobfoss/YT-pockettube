@@ -3,7 +3,7 @@
 ## Current architecture
 
 The standalone, integrity-checked database is the source of the plugin's
-bounded playlist-group projection. The separately installed package registers a
+bounded organization projections. The separately installed package registers a
 YT Library entry point, but YT Library loads it only when explicitly enabled.
 
 ## Ownership and source of truth
@@ -59,12 +59,13 @@ version 1 playlist data.
 
 ## YT Library integration
 
-The plugin advertises the generic `playlist_groups` capability and implements
-`project_playlist_groups()`. The projection contains only:
+The plugin advertises the generic `playlist_groups` and `channel_groups`
+capabilities and implements `project_playlist_groups()` and
+`project_channel_groups()`. Each projection contains only:
 
 - a database revision marker;
 - ordered groups with plugin-local keys, names, parent keys, and optional icons;
-- ordered memberships joined to YT Library by YouTube playlist ID.
+- ordered memberships joined to YT Library by YouTube playlist or channel ID.
 
 The projection is capped at 10,000 groups and 250,000 memberships. Every call
 opens and closes its own SQLite connection, and frequent status checks avoid a
@@ -75,16 +76,17 @@ status.
 YT Library validates and namespaces every projected group key before merging
 groups into browser bootstrap data. It filters navigation counts to canonical
 playlist IDs already in YT Library and uses an explicit ID set for group search.
-Unknown playlist references stay visible in this database and are not
-fabricated as YT Library rows.
+Unknown playlist and channel references stay visible in this database and are
+not fabricated as YT Library rows.
 
-The plugin also exposes bounded, read-only namespaced `status` and `groups`
-routes for diagnosis. It provides no browser assets or background workers. It
+The plugin also exposes bounded, read-only namespaced `status`, `groups`, and
+`channel-groups` routes for diagnosis. It provides no browser assets or
+background workers. It
 must never attach this database to YT Library, create cross-database foreign
 keys, import YT Library modules, or allow YT Library to migrate or write this
 schema.
 
-Subscription groups are intentionally not part of the current YT Library
-projection. This milestone establishes only the plugin-owned schema, migration,
-parser, atomic import, diagnostics, and live data. A future host integration must
-remain generic and join only by canonical channel ID.
+Subscription groups are projected through the host's domain-neutral channel
+group contract and join only by canonical channel ID. Playlist and subscription
+catalog readiness is independent, so a missing or failed first import for one
+domain does not disable the other.

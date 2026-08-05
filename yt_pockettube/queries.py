@@ -72,3 +72,68 @@ def playlist_group_projection(database_path: Path) -> dict[str, Any]:
         }
     finally:
         conn.close()
+
+
+def subscription_group_projection(database_path: Path) -> dict[str, Any]:
+    conn = connect(database_path)
+    try:
+        counts = conn.execute(
+            """
+            SELECT
+              (SELECT COUNT(*) FROM subscription_groups) AS groups,
+              (SELECT COUNT(*) FROM subscription_group_channels) AS memberships
+            """
+        ).fetchone()
+        group_count = int(counts["groups"])
+        membership_count = int(counts["memberships"])
+        if group_count > MAX_PROJECTED_GROUPS:
+            raise RuntimeError(
+                "PocketTube subscription catalog has more than "
+                f"{MAX_PROJECTED_GROUPS} groups"
+            )
+        if membership_count > MAX_PROJECTED_MEMBERSHIPS:
+            raise RuntimeError(
+                "PocketTube subscription catalog has more than "
+                f"{MAX_PROJECTED_MEMBERSHIPS} memberships"
+            )
+        source = conn.execute(
+            """
+            SELECT import_id, source_sha256
+            FROM subscription_import_runs
+            WHERE status = 'complete'
+            ORDER BY import_id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if source is None:
+            raise RuntimeError(
+                "PocketTube subscription catalog has no successful import"
+            )
+        groups = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT group_key, name, parent_key, position, icon
+                FROM subscription_groups
+                ORDER BY CASE WHEN parent_key IS NULL THEN 0 ELSE 1 END,
+                         COALESCE(parent_key, ''), position, group_key
+                """
+            )
+        ]
+        memberships = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT group_key, channel_id, position
+                FROM subscription_group_channels
+                ORDER BY group_key, position, channel_id
+                """
+            )
+        ]
+        return {
+            "revision": f"{source['import_id']}:{source['source_sha256']}",
+            "groups": groups,
+            "memberships": memberships,
+        }
+    finally:
+        conn.close()

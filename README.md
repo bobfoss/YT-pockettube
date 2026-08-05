@@ -2,8 +2,8 @@
 
 YT PocketTube is a standalone local catalog and optional YT Library plugin for
 PocketTube Playlist Manager and Subscription Manager exports. It owns the
-SQLite database and atomic import paths, then exposes a bounded, read-only
-playlist-group projection to YT Library.
+SQLite database and atomic import paths, then exposes bounded, read-only
+playlist-group and channel-group projections to YT Library.
 
 ## Data ownership
 
@@ -70,17 +70,19 @@ $python = "C:\Users\michael.keenan\personal\YT Library\.venv\Scripts\python.exe"
 }
 ```
 
-When the plugin is ready, PocketTube groups appear in YT Library's playlist
-navigation. YT Library namespaces the group keys and resolves membership only
-against canonical playlists already in its own database. Playlist references
-that are not in YT Library remain in this catalog; the plugin does not fabricate
-or import YT Library rows.
+When the plugin is ready, PocketTube groups appear in YT Library's playlist and
+channel navigation. YT Library namespaces the group keys and resolves membership
+only against canonical playlists and channels already in its own database.
+References that are not in YT Library remain in this catalog; the plugin does
+not fabricate or import YT Library rows.
 
-The plugin advertises only the generic `playlist_groups` capability. Subscription
-data is currently database/import-only and is not projected into YT Library.
+The plugin advertises the generic `playlist_groups` and `channel_groups`
+capabilities. Each catalog remains independently usable when the other has no
+successful import.
 The plugin has no browser asset or worker process, never opens the YT Library
 database, and does not expose export paths or source hashes through status. Its
-namespaced `status` and `groups` API routes are read-only diagnostics.
+namespaced `status`, `groups`, and `channel-groups` API routes are read-only
+diagnostics.
 
 ## Development
 

@@ -1,4 +1,4 @@
-"""YT Library plugin entry point for PocketTube playlist organization."""
+"""YT Library plugin entry point for PocketTube organization."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .database import (
     SCHEMA_VERSION,
     database_status,
 )
-from .queries import playlist_group_projection
+from .queries import playlist_group_projection, subscription_group_projection
 
 
 def _public_import(value: Any) -> dict[str, Any] | None:
@@ -30,12 +30,27 @@ def _public_import(value: Any) -> dict[str, Any] | None:
     }
 
 
+def _public_subscription_import(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return {
+        "importId": value.get("import_id"),
+        "status": str(value.get("status") or ""),
+        "sourceName": str(value.get("source_name") or ""),
+        "finishedAt": str(value.get("finished_at") or ""),
+        "groupCount": int(value.get("group_count") or 0),
+        "membershipCount": int(value.get("membership_count") or 0),
+        "channelCount": int(value.get("channel_count") or 0),
+        "issueCount": int(value.get("issue_count") or 0),
+    }
+
+
 class YTPocketTubePlugin:
     plugin_id = "pockettube"
     plugin_name = "YT PocketTube"
     plugin_version = __version__
     plugin_api_version = 2
-    capabilities = frozenset({"playlist_groups"})
+    capabilities = frozenset({"channel_groups", "playlist_groups"})
     browser_assets: tuple[dict[str, str], ...] = ()
 
     def __init__(self) -> None:
@@ -55,9 +70,22 @@ class YTPocketTubePlugin:
         status = database_status(self._database_path, verify_integrity=False)
         latest = _public_import(status.get("latestImport"))
         successful = _public_import(status.get("latestSuccessfulImport"))
+        subscription_status = status.get("subscriptions") or {}
+        subscription_latest = _public_subscription_import(
+            subscription_status.get("latestImport")
+        )
+        subscription_successful = _public_subscription_import(
+            subscription_status.get("latestSuccessfulImport")
+        )
         available = bool(status.get("available"))
         compatible = bool(status.get("compatible"))
-        state = "ready" if available and compatible and successful else "unavailable"
+        state = (
+            "ready"
+            if available
+            and compatible
+            and (successful or subscription_successful)
+            else "unavailable"
+        )
         if available and not compatible:
             state = "incompatible"
         payload = {
@@ -74,10 +102,28 @@ class YTPocketTubePlugin:
                 or {"groups": 0, "memberships": 0, "playlists": 0},
                 "latestImport": latest,
                 "latestSuccessfulImport": successful,
+                "subscriptions": {
+                    "counts": subscription_status.get("counts")
+                    or {"groups": 0, "memberships": 0, "channels": 0},
+                    "latestImport": subscription_latest,
+                    "latestSuccessfulImport": subscription_successful,
+                },
             },
         }
-        if state == "ready" and latest and latest["status"] == "failed":
-            payload["message"] = "Serving the last successful PocketTube import"
+        failed_catalogs = []
+        if latest and latest["status"] == "failed" and successful:
+            failed_catalogs.append("playlist")
+        if (
+            subscription_latest
+            and subscription_latest["status"] == "failed"
+            and subscription_successful
+        ):
+            failed_catalogs.append("subscription")
+        if state == "ready" and failed_catalogs:
+            payload["message"] = (
+                "Serving the last successful PocketTube "
+                f"{' and '.join(failed_catalogs)} import"
+            )
         elif state == "unavailable" and not available:
             payload["message"] = "PocketTube database is not available"
         elif state == "unavailable" and not successful:
@@ -85,12 +131,33 @@ class YTPocketTubePlugin:
         return payload
 
     def project_playlist_groups(self) -> dict[str, Any]:
+        if self._database_path is None:
+            raise RuntimeError("Plugin has not been started")
         status = self.status()
-        if status["state"] != "ready" or self._database_path is None:
+        database = status.get("database") or {}
+        if not database.get("available") or not database.get("compatible"):
             raise RuntimeError(
                 str(status.get("message") or "YT PocketTube is not ready")
             )
+        if not database.get("latestSuccessfulImport"):
+            raise RuntimeError("PocketTube catalog has no successful import")
         return playlist_group_projection(self._database_path)
+
+    def project_channel_groups(self) -> dict[str, Any]:
+        if self._database_path is None:
+            raise RuntimeError("Plugin has not been started")
+        status = self.status()
+        database = status.get("database") or {}
+        if not database.get("available") or not database.get("compatible"):
+            raise RuntimeError(
+                str(status.get("message") or "YT PocketTube is not ready")
+            )
+        subscriptions = database.get("subscriptions") or {}
+        if not subscriptions.get("latestSuccessfulImport"):
+            raise RuntimeError(
+                "PocketTube subscription catalog has no successful import"
+            )
+        return subscription_group_projection(self._database_path)
 
     def handle_api(
         self,
@@ -106,6 +173,11 @@ class YTPocketTubePlugin:
         if path == "groups":
             try:
                 return 200, self.project_playlist_groups()
+            except RuntimeError as exc:
+                return 503, {"error": str(exc), "plugin": self.status()}
+        if path == "channel-groups":
+            try:
+                return 200, self.project_channel_groups()
             except RuntimeError as exc:
                 return 503, {"error": str(exc), "plugin": self.status()}
         return None

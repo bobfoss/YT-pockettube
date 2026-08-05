@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yt-pockettube"
-version = "0.3.0"
-description = "Standalone PocketTube playlist-group catalog for YT Library integration"
+version = "0.4.0"
+description = "Standalone PocketTube organization catalog for YT Library integration"
 readme = "README.md"
 requires-python = ">=3.12"
 
