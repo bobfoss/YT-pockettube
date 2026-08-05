@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yt-pockettube"
-version = "0.1.0"
+version = "0.2.0"
 description = "Standalone PocketTube playlist-group catalog for YT Library integration"
 readme = "README.md"
 requires-python = ">=3.12"
 
 [project.scripts]
 yt-pockettube = "yt_pockettube.cli:main"
+
+[project.entry-points."yt_library.plugins"]
+pockettube = "yt_pockettube.plugin:create_plugin"
 
 [tool.setuptools]
 packages = ["yt_pockettube"]

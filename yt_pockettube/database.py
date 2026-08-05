@@ -9,6 +9,7 @@ from typing import Any
 
 
 SCHEMA_VERSION = 1
+INTEGRATION_CONTRACT_VERSION = 1
 
 
 def utc_now() -> str:
@@ -54,7 +55,11 @@ def initialize_database(path: Path) -> None:
     finally:
         conn.close()
 
-def database_status(path: Path) -> dict[str, Any]:
+def database_status(
+    path: Path,
+    *,
+    verify_integrity: bool = True,
+) -> dict[str, Any]:
     database_path = Path(path)
     if not database_path.is_file():
         return {
@@ -68,7 +73,11 @@ def database_status(path: Path) -> dict[str, Any]:
         version_row = conn.execute(
             "SELECT MAX(version) AS version FROM schema_migrations"
         ).fetchone()
-        version = int(version_row["version"]) if version_row["version"] is not None else None
+        version = (
+            int(version_row["version"])
+            if version_row["version"] is not None
+            else None
+        )
         latest = conn.execute(
             "SELECT * FROM import_runs ORDER BY import_id DESC LIMIT 1"
         ).fetchone()
@@ -90,9 +99,7 @@ def database_status(path: Path) -> dict[str, Any]:
                 """
             ).fetchone()
         )
-        integrity = str(conn.execute("PRAGMA integrity_check").fetchone()[0])
-        foreign_key_errors = len(conn.execute("PRAGMA foreign_key_check").fetchall())
-        return {
+        payload = {
             "available": True,
             "compatible": version == SCHEMA_VERSION,
             "schemaVersion": version,
@@ -100,8 +107,14 @@ def database_status(path: Path) -> dict[str, Any]:
             "counts": counts,
             "latestImport": dict(latest) if latest is not None else None,
             "latestSuccessfulImport": dict(successful) if successful is not None else None,
-            "integrity": integrity,
-            "foreignKeyErrors": foreign_key_errors,
         }
+        if verify_integrity:
+            payload["integrity"] = str(
+                conn.execute("PRAGMA integrity_check").fetchone()[0]
+            )
+            payload["foreignKeyErrors"] = len(
+                conn.execute("PRAGMA foreign_key_check").fetchall()
+            )
+        return payload
     finally:
         conn.close()

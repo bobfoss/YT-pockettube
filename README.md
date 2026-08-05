@@ -1,9 +1,9 @@
 # YT PocketTube
 
-YT PocketTube is a standalone local catalog for PocketTube Playlist Manager
-exports. The current milestone establishes the plugin-owned SQLite database and
-an atomic import path. YT Library plugin entry points, APIs, and browser UI are
-deliberately out of scope until the imported data has been validated.
+YT PocketTube is a standalone local catalog and optional YT Library plugin for
+PocketTube Playlist Manager exports. It owns the SQLite database and atomic
+import path, then exposes a bounded, read-only playlist-group projection to YT
+Library.
 
 ## Data ownership
 
@@ -40,6 +40,38 @@ $python = "C:\Users\michael.keenan\personal\YT Library\.venv\Scripts\python.exe"
 `import` reads and validates the complete export before opening the replacement
 transaction. It reports normalized group, membership, playlist, and issue
 counts as JSON.
+
+## YT Library plugin
+
+Install this project into the YT Library virtual environment, then add an
+explicit activation entry to YT Library's ignored local configuration:
+
+```powershell
+$python = "C:\Users\michael.keenan\personal\YT Library\.venv\Scripts\python.exe"
+& $python -m pip install -e "C:\Users\michael.keenan\personal\YT PocketTube"
+```
+
+```json
+{
+  "plugins": {
+    "pockettube": {
+      "enabled": true,
+      "config": "../YT PocketTube/yt_pockettube.config.json"
+    }
+  }
+}
+```
+
+When the plugin is ready, PocketTube groups appear in YT Library's playlist
+navigation. YT Library namespaces the group keys and resolves membership only
+against canonical playlists already in its own database. Playlist references
+that are not in YT Library remain in this catalog; the plugin does not fabricate
+or import YT Library rows.
+
+The plugin advertises only the generic `playlist_groups` capability. It has no
+browser asset or worker process, never opens the YT Library database, and does
+not expose export paths or source hashes through status. Its namespaced
+`status` and `groups` API routes are read-only diagnostics.
 
 ## Development
 

@@ -1,10 +1,10 @@
 # YT PocketTube Design
 
-## Current milestone
+## Current architecture
 
-The first milestone ends with a populated, integrity-checked standalone
-database. It does not register a YT Library plugin, expose an HTTP API, or add
-browser assets.
+The standalone, integrity-checked database is the source of the plugin's
+bounded playlist-group projection. The separately installed package registers a
+YT Library entry point, but YT Library loads it only when explicitly enabled.
 
 ## Ownership and source of truth
 
@@ -44,9 +44,29 @@ are recorded as import issues.
 Every current-state row points to the successful import that produced it.
 SQLite foreign keys and integrity checks are mandatory.
 
-## Deferred integration
+## YT Library integration
 
-The later plugin milestone will define bounded read projections and failure
-containment against YT Library's generic plugin contract. It must not attach
-this database to YT Library, create cross-database foreign keys, or allow YT
-Library to migrate or write this schema.
+The plugin advertises the generic `playlist_groups` capability and implements
+`project_playlist_groups()`. The projection contains only:
+
+- a database revision marker;
+- ordered groups with plugin-local keys, names, parent keys, and optional icons;
+- ordered memberships joined to YT Library by YouTube playlist ID.
+
+The projection is capped at 10,000 groups and 250,000 memberships. Every call
+opens and closes its own SQLite connection, and frequent status checks avoid a
+full integrity scan. The plugin remains ready against the last successful
+catalog if a later import attempt fails, while reporting that failure in its
+status.
+
+YT Library validates and namespaces every projected group key before merging
+groups into browser bootstrap data. It filters navigation counts to canonical
+playlist IDs already in YT Library and uses an explicit ID set for group search.
+Unknown playlist references stay visible in this database and are not
+fabricated as YT Library rows.
+
+The plugin also exposes bounded, read-only namespaced `status` and `groups`
+routes for diagnosis. It provides no browser assets or background workers. It
+must never attach this database to YT Library, create cross-database foreign
+keys, import YT Library modules, or allow YT Library to migrate or write this
+schema.
