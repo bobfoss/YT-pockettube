@@ -65,7 +65,7 @@ class YTPocketTubePlugin:
             ),
             "service": "local",
             "max_in_flight": 1,
-            "admin_surface": "basic",
+            "admin_surface": "advanced",
             "button_label": "Fetch PocketTube exports",
         },
     )

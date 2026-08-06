@@ -89,7 +89,7 @@ never opens the YT Library database.
 
 The plugin advertises the generic `playlist_groups` and `channel_groups`
 capabilities. Each catalog remains independently usable when the other has no
-successful import. Its **Fetch PocketTube exports** Admin
+successful import. Its **Fetch PocketTube exports** Advanced Admin
 action scans `exports_directory` for standard Playlist Manager and Subscription
 Manager JSON filenames and imports content hashes not already present in the
 corresponding successful PocketTube import history. Failed imports remain
