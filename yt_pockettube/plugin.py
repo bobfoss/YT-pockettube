@@ -12,7 +12,10 @@ from .database import (
     SCHEMA_VERSION,
     database_status,
 )
+from .export_scanner import scan_exports
+from .importers import import_export
 from .queries import playlist_group_projection, subscription_group_projection
+from .subscription_importers import import_subscription_export
 
 
 def _public_import(value: Any) -> dict[str, Any] | None:
@@ -52,9 +55,24 @@ class YTPocketTubePlugin:
     plugin_api_version = 2
     capabilities = frozenset({"channel_groups", "playlist_groups"})
     browser_assets: tuple[dict[str, str], ...] = ()
+    worker_processes = (
+        {
+            "id": "fetch-exports",
+            "name": "Fetch PocketTube exports",
+            "description": (
+                "Import new PocketTube Playlist Manager and Subscription Manager "
+                "JSON exports from the configured local exports directory."
+            ),
+            "service": "local",
+            "max_in_flight": 1,
+            "admin_surface": "basic",
+            "button_label": "Fetch PocketTube exports",
+        },
+    )
 
     def __init__(self) -> None:
         self._database_path: Path | None = None
+        self._exports_directory: Path | None = None
 
     def start(self, context: Any) -> None:
         configured_path = str(context.plugin_config.get("config") or "").strip()
@@ -63,6 +81,126 @@ class YTPocketTubePlugin:
         )
         own_config = load_config(own_config_path) if own_config_path else load_config()
         self._database_path = config_path(own_config, "database")
+        self._exports_directory = config_path(own_config, "exports_directory")
+
+    def plan_worker(
+        self,
+        worker_id: str,
+        context: Any,
+        params: dict[str, list[str]],
+    ) -> list[dict[str, Any]]:
+        del context, params
+        if worker_id != "fetch-exports":
+            raise LookupError(f"Unknown PocketTube worker process: {worker_id}")
+        if self._database_path is None or self._exports_directory is None:
+            raise RuntimeError("Plugin has not been started")
+        if not self._exports_directory.is_dir():
+            raise FileNotFoundError(
+                "Configured PocketTube exports directory is not available"
+            )
+        return [
+            {
+                "task_id": "exports-directory",
+                "subject_id": "PocketTube exports",
+                "title": "PocketTube exports",
+                "payload": {},
+            }
+        ]
+
+    def run_worker(
+        self,
+        worker_id: str,
+        task: dict[str, Any],
+        runtime: Any,
+    ) -> dict[str, Any]:
+        del task
+        if worker_id != "fetch-exports":
+            raise LookupError(f"Unknown PocketTube worker process: {worker_id}")
+        if self._database_path is None or self._exports_directory is None:
+            raise RuntimeError("Plugin has not been started")
+        if runtime.stop_requested():
+            return {"outcome": "interrupted", "message": "Import interrupted"}
+
+        scan = scan_exports(self._database_path, self._exports_directory)
+        for source_name, message in scan.errors:
+            runtime.log("error", f"Could not read {source_name}: {message}")
+        if scan.ignored:
+            runtime.log(
+                "debug",
+                f"Ignored {scan.ignored} unrecognized JSON export file(s)",
+            )
+
+        succeeded = 0
+        failed = len(scan.errors)
+        for candidate in scan.candidates:
+            if runtime.stop_requested():
+                return {
+                    "outcome": "interrupted",
+                    "processed": succeeded + failed,
+                    "found": succeeded,
+                    "failed": failed,
+                    "skipped": scan.already_imported,
+                    "message": "PocketTube export import interrupted",
+                }
+            try:
+                if candidate.kind == "playlist":
+                    result = import_export(
+                        self._database_path,
+                        candidate.source.path,
+                    )
+                    summary = (
+                        f"{result['groups']} groups, "
+                        f"{result['playlists']} playlists"
+                    )
+                else:
+                    result = import_subscription_export(
+                        self._database_path,
+                        candidate.source.path,
+                    )
+                    summary = (
+                        f"{result['groups']} groups, "
+                        f"{result['channels']} channels"
+                    )
+            except Exception as exc:
+                failed += 1
+                error = str(exc).replace(
+                    str(candidate.source.path),
+                    candidate.source.name,
+                )
+                runtime.log(
+                    "error",
+                    f"Failed to import {candidate.source.name}: "
+                    f"{type(exc).__name__}: {error}",
+                )
+                continue
+            succeeded += 1
+            runtime.log(
+                "info",
+                f"Imported {candidate.source.name} ({summary})",
+            )
+
+        processed = succeeded + failed
+        skipped = scan.already_imported
+        if failed:
+            outcome = "partial_failure" if succeeded else "import_failed"
+            message = (
+                f"Imported {succeeded} new PocketTube export(s); "
+                f"{failed} failed"
+            )
+        elif succeeded:
+            outcome = "updated"
+            message = f"Imported {succeeded} new PocketTube export(s)"
+        else:
+            outcome = "no_change"
+            message = "No new PocketTube exports found"
+        return {
+            "outcome": outcome,
+            "processed": processed,
+            "found": succeeded,
+            "failed": failed,
+            "skipped": skipped,
+            "message": message,
+        }
 
     def status(self) -> dict[str, Any]:
         if self._database_path is None:
@@ -184,6 +322,7 @@ class YTPocketTubePlugin:
 
     def shutdown(self) -> None:
         self._database_path = None
+        self._exports_directory = None
 
 
 def create_plugin() -> YTPocketTubePlugin:

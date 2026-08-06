@@ -18,11 +18,14 @@ catalog of either type.
 Copy `yt_pockettube.config.example.json` to the ignored
 `yt_pockettube.config.json`, set `export` to a PocketTube Playlist Manager JSON
 export, and set `subscription_export` to a PocketTube Subscription Manager JSON
-export. Relative paths are resolved from the configuration file's directory.
+export. `exports_directory` is the local directory scanned by the YT Library
+Admin action. Relative paths are resolved from the configuration file's
+directory.
 
 ```json
 {
   "database": "yt_pockettube.sqlite3",
+  "exports_directory": "exports",
   "export": "exports/youtube_playlist_manager.json",
   "subscription_export": "exports/youtube_subscription_manager.json"
 }
@@ -86,9 +89,16 @@ never opens the YT Library database.
 
 The plugin advertises the generic `playlist_groups` and `channel_groups`
 capabilities. Each catalog remains independently usable when the other has no
-successful import.
-The plugin has no browser asset or worker process, never opens the YT Library
-database, and does not expose export paths or source hashes through status. Its
+successful import. Its **Fetch PocketTube exports** Admin
+action scans `exports_directory` for standard Playlist Manager and Subscription
+Manager JSON filenames and imports content hashes not already present in the
+corresponding successful PocketTube import history. Failed imports remain
+eligible for a later retry. This is a local filesystem operation; it does not
+download exports from PocketTube or YouTube. Multiple new snapshots of one type
+are applied oldest to newest so the newest snapshot becomes current.
+
+The plugin has no browser asset, never opens the YT Library database, and does
+not expose export paths or source hashes through status. Its
 namespaced `status`, `groups`, and `channel-groups` API routes are read-only
 diagnostics.
 

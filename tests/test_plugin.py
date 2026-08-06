@@ -28,6 +28,19 @@ class FakeContext:
         return path if path.is_absolute() else self.root / path
 
 
+class FakeRuntime:
+    def __init__(self) -> None:
+        self.messages: list[tuple[str, str]] = []
+        self.stopped = False
+
+    def stop_requested(self) -> bool:
+        return self.stopped
+
+    def log(self, level: str, message: str, subject_id: str = "") -> None:
+        del subject_id
+        self.messages.append((level, message))
+
+
 class PluginTests(unittest.TestCase):
     def create_ready_plugin(self, root: Path):
         database = root / "catalog.sqlite3"
@@ -42,6 +55,7 @@ class PluginTests(unittest.TestCase):
                     "database": str(database),
                     "export": str(export),
                     "subscription_export": str(subscription_export),
+                    "exports_directory": str(root / "exports"),
                 }
             ),
             encoding="utf-8",
@@ -49,6 +63,7 @@ class PluginTests(unittest.TestCase):
         import_export(database, export)
         import_subscription_export(database, subscription_export)
         plugin = create_plugin()
+        (root / "exports").mkdir()
         plugin.start(FakeContext(root))
         return plugin, database, export
 
@@ -66,6 +81,24 @@ class PluginTests(unittest.TestCase):
             self.assertEqual(
                 plugin.capabilities,
                 frozenset({"channel_groups", "playlist_groups"}),
+            )
+            self.assertEqual(
+                plugin.worker_processes,
+                (
+                    {
+                        "id": "fetch-exports",
+                        "name": "Fetch PocketTube exports",
+                        "description": (
+                            "Import new PocketTube Playlist Manager and Subscription "
+                            "Manager JSON exports from the configured local exports "
+                            "directory."
+                        ),
+                        "service": "local",
+                        "max_in_flight": 1,
+                        "admin_surface": "basic",
+                        "button_label": "Fetch PocketTube exports",
+                    },
+                ),
             )
             self.assertEqual(status["state"], "ready")
             self.assertEqual(
@@ -184,6 +217,112 @@ class PluginTests(unittest.TestCase):
             )
             self.assertEqual(response_status, 503)
             self.assertIn("no successful import", response["error"])
+
+    def test_fetch_exports_worker_imports_new_files_then_skips_them(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            exports = root / "exports"
+            exports.mkdir()
+            database = root / "catalog.sqlite3"
+            config = root / "yt_pockettube.config.json"
+            playlist = exports / "youtube_playlist_manager_2026-08-05.json"
+            subscriptions = (
+                exports / "youtube_subscription_manager_2026-08-05.json"
+            )
+            shutil.copyfile(FIXTURE, playlist)
+            shutil.copyfile(SUBSCRIPTION_FIXTURE, subscriptions)
+            config.write_text(
+                json.dumps(
+                    {
+                        "database": str(database),
+                        "exports_directory": str(exports),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            plugin = create_plugin()
+            plugin.start(FakeContext(root))
+            runtime = FakeRuntime()
+
+            plan = plugin.plan_worker("fetch-exports", object(), {})
+            first = plugin.run_worker("fetch-exports", plan[0], runtime)
+            second = plugin.run_worker("fetch-exports", plan[0], runtime)
+
+            self.assertEqual(
+                plan,
+                [
+                    {
+                        "task_id": "exports-directory",
+                        "subject_id": "PocketTube exports",
+                        "title": "PocketTube exports",
+                        "payload": {},
+                    }
+                ],
+            )
+            self.assertEqual(first["outcome"], "updated")
+            self.assertEqual(first["found"], 2)
+            self.assertEqual(first["failed"], 0)
+            self.assertEqual(second["outcome"], "no_change")
+            self.assertEqual(second["skipped"], 2)
+            status = plugin.status()
+            self.assertEqual(status["state"], "ready")
+            self.assertEqual(
+                status["database"]["counts"],
+                {"groups": 3, "memberships": 3, "playlists": 3},
+            )
+            self.assertEqual(
+                status["database"]["subscriptions"]["counts"],
+                {"groups": 3, "memberships": 5, "channels": 4},
+            )
+            self.assertEqual(
+                sum(level == "info" for level, _ in runtime.messages),
+                2,
+            )
+
+    def test_fetch_exports_worker_continues_after_invalid_export(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            exports = root / "exports"
+            exports.mkdir()
+            database = root / "catalog.sqlite3"
+            config = root / "yt_pockettube.config.json"
+            (exports / "youtube_playlist_manager_broken.json").write_text(
+                "{broken",
+                encoding="utf-8",
+            )
+            shutil.copyfile(
+                SUBSCRIPTION_FIXTURE,
+                exports / "youtube_subscription_manager_valid.json",
+            )
+            config.write_text(
+                json.dumps(
+                    {
+                        "database": str(database),
+                        "exports_directory": str(exports),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            plugin = create_plugin()
+            plugin.start(FakeContext(root))
+            runtime = FakeRuntime()
+
+            result = plugin.run_worker(
+                "fetch-exports",
+                {"payload": {}},
+                runtime,
+            )
+
+            self.assertEqual(result["outcome"], "partial_failure")
+            self.assertEqual(result["found"], 1)
+            self.assertEqual(result["failed"], 1)
+            self.assertEqual(
+                plugin.status()["database"]["subscriptions"]["counts"],
+                {"groups": 3, "memberships": 5, "channels": 4},
+            )
+            self.assertTrue(
+                any(level == "error" for level, _ in runtime.messages)
+            )
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ class ConfigTests(unittest.TestCase):
                         "database": "runtime/catalog.sqlite3",
                         "export": "../exports/pockettube.json",
                         "subscription_export": "../exports/subscriptions.json",
+                        "exports_directory": "../exports",
                     }
                 ),
                 encoding="utf-8",
@@ -38,6 +39,26 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(
                 config_path(config, "subscription_export"),
                 (config_file.parent / "../exports/subscriptions.json").resolve(),
+            )
+            self.assertEqual(
+                config_path(config, "exports_directory"),
+                (config_file.parent / "../exports").resolve(),
+            )
+
+    def test_exports_directory_defaults_beside_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_file = root / "yt_pockettube.config.json"
+            config_file.write_text(
+                json.dumps({"database": "catalog.sqlite3"}),
+                encoding="utf-8",
+            )
+
+            config = load_config(config_file)
+
+            self.assertEqual(
+                config_path(config, "exports_directory"),
+                (root / "exports").resolve(),
             )
 
     def test_missing_configuration_has_actionable_error(self) -> None:
