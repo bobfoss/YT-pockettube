@@ -1,8 +1,10 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 name = "yt-pockettube"
 version = "0.6.1"
 description = "Standalone PocketTube organization catalog for YT Library integration"

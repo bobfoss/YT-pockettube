@@ -1,5 +1,10 @@
 # YT PocketTube
 
+Licensed under the GNU General Public License, version 3 or (at your option)
+any later version (`GPL-3.0-or-later`). See [LICENSE](LICENSE). Distributed
+without any warranty; see the license for details. Third-party dependencies
+retain their own licenses.
+
 YT PocketTube is a standalone local catalog and optional YT Library plugin for
 PocketTube Playlist Manager and Subscription Manager exports. It owns the
 SQLite database and atomic import paths, then exposes bounded, read-only
