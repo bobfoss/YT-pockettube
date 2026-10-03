@@ -21,7 +21,7 @@ pockettube = "yt_pockettube.plugin:create_plugin"
 packages = ["yt_pockettube"]
 
 [tool.setuptools.package-data]
-yt_pockettube = ["schema.sql"]
+yt_pockettube = ["schema.sql", "ytl-plugin.json"]
 
 [tool.ruff]
 target-version = "py312"
